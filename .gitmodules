@@ -1,0 +1,3 @@
+[submodule "lucene/util"]
+	path = lucene/util
+	url = https://github.com/yangxi/luceneutil.git
