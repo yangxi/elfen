@@ -1,0 +1,7 @@
+This repository has the code for re-producing experiments in the Elfen schdduler paper: "Elfen Scheduling: Fine-Grain Principled Borrowing from Latency-Critical Workloads using Simultaneous Multithreading", in Proceedings of the 2016 USENIX Annual Technical Conference (USENIX ATC'16), Denver, CO, June 22-24, 2016.
+
+lucene: Lucene searching server and client, which are based on Lucene regression framework https://github.com/mikemccand/luceneutil
+nanonap: Linux kernel patch and the nanonap kernel module.
+microbench: Instrumentation code for C micro-benchmarks used in the paper.
+dacapobench: JikesRVM patch for running Dacapo benchmarks as the batch workload.
+misc: scripts for processing the results.
