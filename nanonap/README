@@ -1,0 +1,12 @@
+This kernel module implements the user interface of the nanonap. To use this
+module, the kernel has to support the nanonap first. You can either patch
+the kernel(Linux 4.3.0) with "./kernel_nanonap.patch" or clone the "BATCH" branch
+of a forked Linux repository(https://github.com/yangxi/linux).
+
+"make; sudo insmode nanonap.ko;" loads the nanonap module. It creates a device
+at "/dev/nanonap". "test_nanonap.c" demonstrates how to open this device and issue nanonap
+calls. "make user" compile "test_nanonap.c" to
+
+Nanonap allocates a per-cpu sleeping flag. When any CPU becomes idle, it touches the paired
+CPU's sleeping flag, so it wakes up the napping task if there was a tasking napping on the
+paired CPU.
