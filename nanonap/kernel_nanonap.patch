@@ -1,0 +1,123 @@
+diff --git a/arch/x86/entry/entry_64.S b/arch/x86/entry/entry_64.S
+index 055a01d..53c094d 100644
+--- a/arch/x86/entry/entry_64.S
++++ b/arch/x86/entry/entry_64.S
+@@ -182,8 +182,10 @@ entry_SYSCALL_64_fastpath:
+ #endif
+ 	ja	1f				/* return -ENOSYS (already in pt_regs->ax) */
+ 	movq	%r10, %rcx
++	movl %eax,PER_CPU_VAR(shim_curr_syscall)
+ 	call	*sys_call_table(, %rax, 8)
+ 	movq	%rax, RAX(%rsp)
++	movl $-1,PER_CPU_VAR(shim_curr_syscall)
+ 1:
+ /*
+  * Syscall return path ending with SYSRET (fast path).
+diff --git a/arch/x86/kernel/process_64.c b/arch/x86/kernel/process_64.c
+index b35921a..c2bd5d9 100644
+--- a/arch/x86/kernel/process_64.c
++++ b/arch/x86/kernel/process_64.c
+@@ -52,6 +52,8 @@
+ asmlinkage extern void ret_from_fork(void);
+ 
+ __visible DEFINE_PER_CPU(unsigned long, rsp_scratch);
++__visible DEFINE_PER_CPU(int, shim_curr_syscall);
++EXPORT_PER_CPU_SYMBOL(shim_curr_syscall);
+ 
+ /* Prints also some state that isn't saved in the pt_regs */
+ void __show_regs(struct pt_regs *regs, int all)
+diff --git a/arch/x86/mm/init.c b/arch/x86/mm/init.c
+index 1d8a83d..0d407e1 100644
+--- a/arch/x86/mm/init.c
++++ b/arch/x86/mm/init.c
+@@ -640,9 +640,9 @@ int devmem_is_allowed(unsigned long pagenr)
+ 		return 1;
+ 	if (iomem_is_exclusive(pagenr << PAGE_SHIFT))
+ 		return 0;
+-	if (!page_is_ram(pagenr))
+-		return 1;
+-	return 0;
++	//	if (!page_is_ram(pagenr))
++	//	        return 1;
++	return 1;
+ }
+ 
+ void free_init_pages(char *what, unsigned long begin, unsigned long end)
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index bcd214e..6b16855 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -2759,9 +2759,15 @@ unlock:
+ 
+ DEFINE_PER_CPU(struct kernel_stat, kstat);
+ DEFINE_PER_CPU(struct kernel_cpustat, kernel_cpustat);
++DEFINE_PER_CPU(unsigned long, shim_curr_task);
++DEFINE_PER_CPU(unsigned long, shim_sleep_flag);
++DEFINE_PER_CPU(unsigned long *, shim_wakeup_ptr);
+ 
+ EXPORT_PER_CPU_SYMBOL(kstat);
+ EXPORT_PER_CPU_SYMBOL(kernel_cpustat);
++EXPORT_PER_CPU_SYMBOL(shim_curr_task);
++EXPORT_PER_CPU_SYMBOL(shim_sleep_flag);
++EXPORT_PER_CPU_SYMBOL(shim_wakeup_ptr);
+ 
+ /*
+  * Return accounted runtime for the task.
+@@ -3118,7 +3124,7 @@ static void __sched __schedule(void)
+ 		rq->nr_switches++;
+ 		rq->curr = next;
+ 		++*switch_count;
+-
++	        __this_cpu_write(shim_curr_task, (unsigned long)task_pid_nr(next) | ((unsigned long)task_tgid_nr(next)<<32));
+ 		rq = context_switch(rq, prev, next); /* unlocks the rq */
+ 		cpu = cpu_of(rq);
+ 	} else {
+diff --git a/kernel/sched/idle.c b/kernel/sched/idle.c
+index 4a2ef5a..462aed9 100644
+--- a/kernel/sched/idle.c
++++ b/kernel/sched/idle.c
+@@ -200,6 +200,8 @@ exit_idle:
+ }
+ 
+ DEFINE_PER_CPU(bool, cpu_dead_idle);
++DECLARE_PER_CPU(unsigned long, shim_sleep_flag);
++DECLARE_PER_CPU(unsigned long*, shim_wakeup_ptr);
+ 
+ /*
+  * Generic idle loop implementation
+@@ -222,6 +224,8 @@ static void cpu_idle_loop(void)
+ 		tick_nohz_idle_enter();
+ 
+ 		while (!need_resched()) {
++		  unsigned long * shim_target_flag = __this_cpu_read(shim_wakeup_ptr);
++		  *shim_target_flag  = 0xdead;
+ 			check_pgt_cache();
+ 			rmb();
+ 
+@@ -280,6 +284,8 @@ static void cpu_idle_loop(void)
+ 
+ void cpu_startup_entry(enum cpuhp_state state)
+ {
++	int my_cpu,target_cpu,nr_cpu;
++	unsigned long *shim_target_wait;
+ 	/*
+ 	 * This #ifdef needs to die, but it's too late in the cycle to
+ 	 * make this generic (arm and sh have never invoked the canary
+@@ -295,6 +301,17 @@ void cpu_startup_entry(enum cpuhp_state state)
+ 	 */
+ 	boot_init_stack_canary();
+ #endif
++	my_cpu = smp_processor_id();
++	nr_cpu = num_possible_cpus();
++	if (my_cpu < nr_cpu/2)
++		target_cpu = my_cpu + nr_cpu/2;
++	else
++		target_cpu = my_cpu - nr_cpu/2;
++
++	shim_target_wait = per_cpu_ptr(&shim_sleep_flag, target_cpu);
++	__this_cpu_write(shim_wakeup_ptr, shim_target_wait);
++	printk(KERN_DEBUG "SHIM:idle starts on cpu %d, neighbour cpu %d, waits on %p, neighbour on %p\n", my_cpu, target_cpu, &shim_wakeup_ptr, shim_target_wait);
++
+ 	arch_cpu_idle_prepare();
+ 	cpu_idle_loop();
+ }
