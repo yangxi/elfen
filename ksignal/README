@@ -1,9 +1,16 @@
+# Intro
+
 This kernel module exports two kernel per-CPU software signals:
 shim_curr_task shows the current running task's tid and pid.
 shim_curr_syscall shows whether the current running task is in the system call,
-if it is in, reports the system call number.  How kernel generates the two
-signals could be found either from "../nanonap/kernel_nanonap.patch" or
+if it is in, reports the system call number.
+
+How kernel generates the two signals could be found either from "../nanonap/kernel_nanonap.patch" or
 from the "BATCH" branch of a forked Linux repository(https://github.com/yangxi/linux).
+When you compile the Linux kernel, make sure you turn on this flag "CONFIG_DEVMEM=y", because
+you need to mmap the kernel memory space to the user space via "/dev/mem".
+
+# Usage
 
 "make; sudo insmod ksignal.ko;" loads this module. It creates two files:
 "/sys/module/ksignal/parameters/task_signal" shows the physical addresses of each CPU's shim_curr_task signal physical address.
