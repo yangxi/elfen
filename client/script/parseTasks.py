@@ -114,9 +114,11 @@ def parse_log(fname):
     for i in range(0, nr_iters):
         iters_index.append(i * 1141);
 
+    cols[key_col["clienttime"]] = np.array(cols[key_col["clienttime"]]);
     cols[key_col["serverLatency"]] = (np.array(cols[key_col["finishStamp"]]) - np.array(cols[key_col["receiveStamp"]]))/(1000 * 1000)
     cols[key_col["serverPtime"]] = (np.array(cols[key_col["finishStamp"]]) - np.array(cols[key_col["processStamp"]]))/(1000 * 1000)
     cols[key_col["serverQtime"]] = (np.array(cols[key_col["processStamp"]]) - np.array(cols[key_col["receiveStamp"]]))/(1000 * 1000)
+    cpuPtime = np.array(cols[key_col["retiredCycles"]])/(2*1000*1000)
 
     f = open('./rtime.csv', 'w')
     f.write("#no id clientlatency serverlatency serverPtime serverQtime\n");
@@ -124,7 +126,57 @@ def parse_log(fname):
         f.write("%d,%d,%d,%d,%d,%d\n" % (i+1, cols[key_col["taskid"]][i], cols[key_col["clienttime"]][i], cols[key_col["serverLatency"]][i], cols[key_col["serverPtime"]][i], cols[key_col["serverQtime"]][i]));
     f.close();
 
+    #now we want to compute a histogram about the time
+    # in total, we have 20,000 requrests (20 iterations of 1k requrest)
+    #x [1-100] represents percentable of requests
+    #y: x% requests finished lower than y(ms)
+    client_time = cols[key_col["clienttime"]];
+    sorted_index = np.argsort(client_time);
+    sorted_client_time = np.sort(client_time);
+    f = open('./client-time-max.csv', 'w');
+    f.write("#percent #id #client #server #serverq #cputim\n");
+#    for i in range(99, -1, -1):
+    for i in range(0, 100):
+        ri = (i+1)*200 - 1
+        ri_base = i*200;
+        ri_top  = (i+1)*200;
+        client = sorted_client_time[ri]
+        client_index = sorted_index[ri]
+        taskid = cols[key_col["taskid"]][client_index];
+        serverlatency = cols[key_col["serverLatency"]][client_index];
+        serverqtime = cols[key_col["serverQtime"]][client_index];
+        #computer averageqtime
+        sum_server_qtime = 0;
+        for qindex in range(ri_base,ri_top):
+            server_index = sorted_index[qindex];
+            this_server_time = cols[key_col["serverQtime"]][server_index]
+            sum_server_qtime += this_server_time;
+        avg_server_qtime = sum_server_qtime / (ri_top - ri_base);    
+        cputime = cpuPtime[client_index];
+        f.write("%d,%d,%d,%d,%d,%d,%d\n" % (i+1, taskid, client, serverlatency, serverqtime, cputime, avg_server_qtime))
+    f.close();
 
+    #x is ms, y is % of requrest
+    f = open('./client-time-dist.csv', 'w');
+    client_time_freq = norfreq(client_time)
+    client_time_dist = norfreq_to_timefreq(client_time_freq);
+    for i in range(0, len(client_time_dist[0])):
+        f.write("%d, %.3f, %.3f\n" % (client_time_dist[0][i],client_time_dist[1][i] * 100,client_time_dist[2][i]* 100));
+    f.close()
+
+    f = open('./top200.csv', 'w');
+    top200_base = 20000 - 200;
+    for i in range(0, 200):
+        ri = top200_base + i;
+        client = sorted_client_time[ri]
+        client_index = sorted_index[ri]
+        taskid = cols[key_col["taskid"]][client_index];
+        serverlatency = cols[key_col["serverLatency"]][client_index];
+        serverqtime = cols[key_col["serverQtime"]][client_index];
+        cputime = cpuPtime[client_index];
+        f.write("%d,%d,%d,%d,%d,%d,%d\n" % (i+1, taskid, client, serverlatency, serverqtime, cputime, serverqtime + cputime))
+    f.close();
+    
     #marsk retiredCycles and retiredIns
     # cycle_index = key_col["retiredCycles"];
     # cycle_col = cols[cycle_index]
