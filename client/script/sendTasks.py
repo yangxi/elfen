@@ -251,7 +251,7 @@ def pruneTasks(taskStrings, numTasksPerCat):
 
   return prunedTasks
 
-def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration, out, handleCtrlC):
+def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration, out, handleCtrlC, randomshuffle):
 
   recentLatencyMS = 0
   recentQueueTimeMS = 0
@@ -262,6 +262,7 @@ def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, 
 
   f = open(tasksFile, 'rb')
   taskStrings = []
+  wantline = 1000;
   while True:
     l = f.readline()
     if l == '':
@@ -280,7 +281,13 @@ def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, 
     taskStrings.append(s)
 
   r = random.Random(0)
-  r.shuffle(taskStrings)
+  if (randomshuffle == "shuffle"):
+    print("shuffle requests width seed 0\n");
+    r.shuffle(taskStrings)
+    for s in taskStrings[0:1000]:
+      print("%s" %s);
+    exit(0);
+
 #  out.write('%d tasks\n' % len(taskStrings))
 #  print taskStrings
 #  exit(0);
@@ -396,5 +403,6 @@ if __name__ == '__main__':
   runTimeSec = float(sys.argv[6])
   savFile = sys.argv[7]
   iteration = sys.argv[8]
+  randomshuffle = sys.argv[9]
 
-  run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration,  sys.stdout, True)
+  run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration,  sys.stdout, True, randomshuffle)
