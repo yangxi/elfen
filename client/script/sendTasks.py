@@ -81,7 +81,7 @@ class Results:
     self.buffers = []
     self.current = cStringIO.StringIO()
     self.fOut = open(savFile, 'wb')
-    self.current.write("#timestamp->float,latencyMS->float,queueTimeMS->float,processTimeMS->float,totalHitCount->int,taskStrSize->unsigned char\n");
+    self.current.write("#taskID->int,totalHitCount->int,receiveStamp->long,processStamp->long,finishStamp->long,retiredInstruction->long,unhaltedCycles->long,clientLatency->int\n");
     self.nr_results = 0;
   def add(self, reply):
     self.nr_results += 1;

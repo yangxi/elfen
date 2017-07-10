@@ -151,7 +151,7 @@ def parse_log(fname):
             server_index = sorted_index[qindex];
             this_server_time = cols[key_col["serverQtime"]][server_index]
             sum_server_qtime += this_server_time;
-        avg_server_qtime = sum_server_qtime / (ri_top - ri_base);    
+        avg_server_qtime = sum_server_qtime / (ri_top - ri_base);
         cputime = cpuPtime[client_index];
         f.write("%d,%d,%d,%d,%d,%d,%d\n" % (i+1, taskid, client, serverlatency, serverqtime, cputime, avg_server_qtime))
     f.close();
@@ -176,7 +176,7 @@ def parse_log(fname):
         cputime = cpuPtime[client_index];
         f.write("%d,%d,%d,%d,%d,%d,%d\n" % (i+1, taskid, client, serverlatency, serverqtime, cputime, serverqtime + cputime))
     f.close();
-    
+
     #marsk retiredCycles and retiredIns
     # cycle_index = key_col["retiredCycles"];
     # cycle_col = cols[cycle_index]
