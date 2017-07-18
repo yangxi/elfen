@@ -21,6 +21,7 @@
 
 #define NR_SHIM_CPU (100)
 
+DECLARE_PER_CPU(unsigned int, shim_curr_flag);
 DECLARE_PER_CPU(unsigned long, shim_curr_task);
 DECLARE_PER_CPU(int, shim_curr_syscall);
 
@@ -32,11 +33,16 @@ static unsigned long syscall_signal[NR_SHIM_CPU];
 module_param_array(syscall_signal, ulong, NULL, 0644);
 MODULE_PARM_DESC(syscall_signal, "Per-CPUsignal shows the current systemcall.");
 
+static unsigned long flag_signal[NR_SHIM_CPU];
+module_param_array(flag_signal, ulong, NULL, 0644);
+MODULE_PARM_DESC(flag_signal, "Per-CPU signal shows the status of the current running task.");
+
 static int ksignals_init(void)
 {
   int cpu;
   volatile int * shim_syscall_signal = NULL;
   volatile unsigned long * shim_task_signal = NULL;
+  volatile unsigned int * shim_flag_signal = NULL;
 
   pr_debug("syscall %p, task %p\n", &shim_curr_syscall, &shim_curr_task);
   for_each_possible_cpu (cpu) {
@@ -45,9 +51,11 @@ static int ksignals_init(void)
 
     shim_syscall_signal = per_cpu_ptr(&shim_curr_syscall, cpu);
     shim_task_signal = per_cpu_ptr(&shim_curr_task, cpu);
+    shim_flag_signal = per_cpu_ptr(&shim_curr_flag, cpu);
 
     task_signal[cpu] = (unsigned long)__pa(shim_task_signal);
     syscall_signal[cpu] = (unsigned long)__pa(shim_syscall_signal);
+    flag_signal[cpu] = (unsigned long)__pa(shim_flag_signal);
 
 
     pr_debug("CPU %d SHIM_SYSCALL, va %p, pa %lx\n", cpu, shim_syscall_signal, __pa(shim_syscall_signal));
