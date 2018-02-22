@@ -107,20 +107,28 @@ class Results:
 
 class SendTasks:
 
-  def __init__(self, serverHost, serverPort, out, runTimeSec, savFile):
+  def __init__(self, serverHost, serverPort, out, runTimeSec, savFile, randombackup):
     self.startTime = time.time()
 
     self.out = out
     self.runTimeSec = runTimeSec
     self.results = Results(savFile)
-#map {taskID -> (startTime, task)}
+    #map {taskID -> (startTime, task)}
     self.sent = {}
     self.queue = Queue.Queue()
-
+    self.lock = threading.Lock();
+    
+    self.randombackup = randombackup;
     self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     self.sock.connect((serverHost, serverPort))
+    self.backupSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM);
+    self.backupSock.connect((serverHost, serverPort + 1))
 
     t = threading.Thread(target=self.gatherResponses,
+                         args=())
+    t.setDaemon(True)
+    t.start()
+    t = threading.Thread(target=self.gatherDupResponses,
                          args=())
     t.setDaemon(True)
     t.start()
@@ -135,9 +143,80 @@ class SendTasks:
   def send(self, startTime, task):
     taskString = task + ";" + str(self.taskID);
     taskString = taskString + ((MAX_BYTES-len(taskString))*' ')
-    self.sent[self.taskID] = (startTime, taskString)
-    self.queue.put((startTime, taskString))
+#    print 'taskString is ' + taskString;
+    self.sent[self.taskID] = (startTime, taskString);
+    self.queue.put((startTime,taskString))
     self.taskID += 1
+
+  def gatherDupResponses(self):
+    while True:
+      result = ''
+      while len(result) < 103:
+        result = result + self.backupSock.recv(103 - len(result))
+#      print result
+      taskID, totalHitCount, receiveStamp, processStamp, finishStamp, retiredIns, unhaltedCycles = result.split(':')
+#      l = long(finishStamp) - long(receiveStamp)
+#      print 'receive backup request ' + taskID + ":" + str(l) + "[" + str(receiveStamp) + "," + str(finishStamp) + "]";
+      taskID = int(taskID)
+      self.lock.acquire();
+      if (self.sent.has_key(taskID) == False):
+        self.lock.release();
+        continue;
+#      print ('backup returns first' + str(taskID));
+#      queueTimeNS = long(processStamp) - long(receiveStamp);
+#      processTimeNS = long(finishStamp) - long(processStamp);
+#taskID, totalHitCount, queueTimeNS, processTimeNS = result.split(':')
+      try:
+        taskStartTime, taskString = self.sent[taskID]
+      except KeyError:
+        print 'WARNING: ignore back bad return taskID=%s' % taskID
+        continue
+      del self.sent[taskID];
+      self.lock.release();
+#      totalHitCount = int(totalHitCount)
+#      queueTimeNS = int(queueTimeNS)
+#      queueTimeMS = queueTimeNS/1000000.0
+#      processTimeNS = int(processTimeNS);
+#      processTimeMS = processTimeNS/1000000.0
+      endTime = time.time()
+#      intSec = int(endTime)
+#      if intSec != lastSec:
+#        if intSec - self.startTime >= 1:
+#          actualQPSStats.add(float(queriesThisSec))
+#        queriesThisSec = 1
+#        lastSec = intSec
+#      else:
+#        queriesThisSec += 1
+
+
+      latencyMS = (endTime-taskStartTime)*1000
+#      result.append(str(latencyMS));
+#      queueTimeStats.add(queueTimeMS)
+#      totalTimeStats.add(latencyMS)
+      self.results.add(result+(": %d" % latencyMS));
+#      self.results.add(taskString.strip(),
+#                       totalHitCount,
+#                       taskStartTime-startTime,
+#                       latencyMS,
+#                       queueTimeMS,
+#                       processTimeMS)
+
+      # now = time.time()
+      # if now - lastPrint > 2.0:
+      #   pctDone = 100.0*(now - startTime) / self.runTimeSec
+      #   if pctDone > 100.0:
+      #     pctDone = 100.0
+      #   self.out.write('%6.1f s: %5.1f%%: %5.1f qps in; %5.1f qps out; %6.1f/%6.1f ms [%d, %d]\n' % \
+      #                  (now - startTime, pctDone,
+      #                   self.taskID/(now-startTime),
+      #                   actualQPSStats.get(),
+      #                   totalTimeStats.get(),
+      #                   queueTimeStats.get(),
+      #                   self.queue.qsize(),
+      #                   len(self.sent)))
+      #   #self.out.flush()
+      #   lastPrint = now
+
 
   def gatherResponses(self):
 
@@ -159,13 +238,27 @@ class SendTasks:
       result = ''
       while len(result) < 103:
         result = result + self.sock.recv(103 - len(result))
-#      print result
+        #      print result
       taskID, totalHitCount, receiveStamp, processStamp, finishStamp, retiredIns, unhaltedCycles = result.split(':')
-#      queueTimeNS = long(processStamp) - long(receiveStamp);
-#      processTimeNS = long(finishStamp) - long(processStamp);
-#taskID, totalHitCount, queueTimeNS, processTimeNS = result.split(':')
-
+#      if (int(taskID) % 100 == 0):
+#        l = long(finishStamp) - long(receiveStamp);
+#        print 'receive request ' + taskID + ":" + str(l) + "[" + str(receiveStamp) + "," + str(finishStamp) + "]";
       taskID = int(taskID)
+      self.lock.acquire();
+      if (self.sent.has_key(taskID) == False):
+        self.lock.release();
+        continue;
+        #      queueTimeNS = long(processStamp) - long(receiveStamp);
+        #      processTimeNS = long(finishStamp) - long(processStamp);
+        #taskID, totalHitCount, queueTimeNS, processTimeNS = result.split(':')
+      try:
+        taskStartTime, taskString = self.sent[taskID]
+      except KeyError:
+        print 'WARNING: ignore bad return taskID=%s' % taskID
+        continue
+      del self.sent[taskID]
+      self.lock.release();
+
 #      totalHitCount = int(totalHitCount)
 #      queueTimeNS = int(queueTimeNS)
 #      queueTimeMS = queueTimeNS/1000000.0
@@ -181,12 +274,7 @@ class SendTasks:
 #      else:
 #        queriesThisSec += 1
 
-      try:
-        taskStartTime, taskString = self.sent[taskID]
-      except KeyError:
-        print 'WARNING: ignore bad return taskID=%s' % taskID
-        continue
-      del self.sent[taskID]
+
       latencyMS = (endTime-taskStartTime)*1000
 #      result.append(str(latencyMS));
 #      queueTimeStats.add(queueTimeMS)
@@ -224,16 +312,22 @@ class SendTasks:
     #send "start" message to the server indicating that we are going to start to send requests.
     #self.sock.send("START//\n");
 
-
+    nr_send = 0;
     while True:
+      nr_send += 1;
       timeTask = self.queue.get()
       sendTime = timeTask[0];
       task = timeTask[1];
       startTime = time.time()
       while len(task) > 0:
         sent = self.sock.send(task)
+        if (self.randombackup != 0):
+          if ((nr_send - 1) % self.randombackup == 0):
+          #          print 'Send backup request' + task;
+            backupSent = self.backupSock.send(task)
+
 #        print 'sendTime:%.10f, startTime:%.10f, nowTime:%.10f\n' %(sendTime, startTime, time.time());
-        if sent <= 0:
+        if sent <= 0 and backupSend <= 0:
           raise RuntimeError('failed to send task "%s"' % task)
         task = task[sent:]
 
@@ -253,7 +347,7 @@ def pruneTasks(taskStrings, numTasksPerCat):
 
   return prunedTasks
 
-def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration, out, handleCtrlC, randomshuffle):
+def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration, out, handleCtrlC, randomshuffle, randombackup):
 
   recentLatencyMS = 0
   recentQueueTimeMS = 0
@@ -265,6 +359,7 @@ def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, 
   f = open(tasksFile, 'rb')
   taskStrings = []
   wantline = 1000;
+  nrtask = 0;
   while True:
     l = f.readline()
     if l == '':
@@ -276,7 +371,9 @@ def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, 
     l = l.strip()
     if l == '':
       continue
-    s = l
+    s = l;
+    nrtask += 1;
+#    print s
     if len(s) > MAX_BYTES:
       raise RuntimeError('task is > %d bytes: %s' % (MAX_BYTES, l))
 #    s = s + ((MAX_BYTES-len(s))*' ')
@@ -300,7 +397,7 @@ def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, 
   # Shuffle again (pruneTasks collates):
 #  r.shuffle(taskStrings)
 
-  tasks = SendTasks(serverHost, serverPort, out, runTimeSec, savFile)
+  tasks = SendTasks(serverHost, serverPort, out, runTimeSec, savFile, randombackup)
 
   targetTime = tasks.startTime
 
@@ -322,7 +419,7 @@ def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, 
       iters += 1
 
       for task in taskStrings:
-
+# exp distribution
         targetTime += r.expovariate(meanQPS)
 
         pause = targetTime - time.time()
@@ -406,5 +503,6 @@ if __name__ == '__main__':
   savFile = sys.argv[7]
   iteration = sys.argv[8]
   randomshuffle = sys.argv[9]
+  randombackup = int(sys.argv[10]);
 
-  run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration,  sys.stdout, True, randomshuffle)
+  run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, savFile, iteration,  sys.stdout, True, randomshuffle, randombackup)
