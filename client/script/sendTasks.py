@@ -133,8 +133,10 @@ class SendTasks:
     self.taskID = 0
 
   def send(self, startTime, task):
-    self.sent[self.taskID] = (startTime, task)
-    self.queue.put((startTime,task))
+    taskString = task + ";" + str(self.taskID);
+    taskString = taskString + ((MAX_BYTES-len(taskString))*' ')
+    self.sent[self.taskID] = (startTime, taskString)
+    self.queue.put((startTime, taskString))
     self.taskID += 1
 
   def gatherResponses(self):
@@ -277,7 +279,7 @@ def run(tasksFile, serverHost, serverPort, meanQPS, numTasksPerCat, runTimeSec, 
     s = l
     if len(s) > MAX_BYTES:
       raise RuntimeError('task is > %d bytes: %s' % (MAX_BYTES, l))
-    s = s + ((MAX_BYTES-len(s))*' ')
+#    s = s + ((MAX_BYTES-len(s))*' ')
     taskStrings.append(s)
 
   r = random.Random(0)
