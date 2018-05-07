@@ -165,8 +165,8 @@ def parse_log(fname):
     f.close()
 
     f = open('./top200.csv', 'w');
-    top200_base = 20000 - 200;
-    for i in range(0, 200):
+    top200_base = 20000 - 400 - 1;
+    for i in range(0, 401):
         ri = top200_base + i;
         client = sorted_client_time[ri]
         client_index = sorted_index[ri]
@@ -174,7 +174,7 @@ def parse_log(fname):
         serverlatency = cols[key_col["serverLatency"]][client_index];
         serverqtime = cols[key_col["serverQtime"]][client_index];
         cputime = cpuPtime[client_index];
-        f.write("%d,%d,%d,%d,%d,%d,%d\n" % (i+1, taskid, client, serverlatency, serverqtime, cputime, serverqtime + cputime))
+        f.write("%d,%d,%d,%d,%d,%d,%d\n" % (i, taskid, client, serverlatency, serverqtime, cputime, serverqtime + cputime))
     f.close();
 
     #marsk retiredCycles and retiredIns
