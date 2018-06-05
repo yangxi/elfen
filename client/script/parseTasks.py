@@ -242,6 +242,11 @@ def parse_lucene_iter(parsed_log):
     ltimeMS = ltimeNS/(1000*1000);
     ltime_hist = norfreq(ltimeMS);
     ltime_perc = latency(ltimeNS);
+    ctimeCol = parsed_log["key_col"]["clienttime"];
+    ctimeMS = np.array(cols[ctimeCol]);
+    print ctimeMS;
+    ctime_hist = norfreq(ctimeMS);
+    ctime_perc = latency(ctimeMS);
 
 
 
@@ -283,7 +288,7 @@ def parse_lucene_iter(parsed_log):
 #            print "id:%d -> ptime %d, ltime %d diff %s" % (raws[i][0],ptimeMS[i], ltimeMS[i], np.array(raws[i]) - np.array(raws[i-1]));
 
 
-    return {"ptime_time_hist":ptime_time_hist, "ptime_hist":ptime_hist,"ptime_perc":ptime_perc,"ltime_hist":ltime_hist,"ltime_perc":ltime_perc,"idletime_hist":idletime_hist,"idletime_perc":idletime_perc, "ipkc_hist":ipkc_hist,"ipkc_perc":ipkc_perc};
+    return {"ctime_hist":ctime_hist, "ctime_perc":ctime_perc, "ptime_time_hist":ptime_time_hist, "ptime_hist":ptime_hist,"ptime_perc":ptime_perc,"ltime_hist":ltime_hist,"ltime_perc":ltime_perc,"idletime_hist":idletime_hist,"idletime_perc":idletime_perc, "ipkc_hist":ipkc_hist,"ipkc_perc":ipkc_perc};
 
 
 
@@ -395,8 +400,11 @@ if __name__ == "__main__":
             ltime_50 = logs[qps]["ltime_perc"]["50"]/(1000.0*1000);
             ltime_95 = logs[qps]["ltime_perc"]["95"]/(1000.0*1000);
             ltime_99 = logs[qps]["ltime_perc"]["99"]/(1000.0*1000);
+            ctime_50 = logs[qps]["ctime_perc"]["50"];
+            ctime_95 = logs[qps]["ctime_perc"]["95"];
+            ctime_99 = logs[qps]["ctime_perc"]["99"];
             bl += " [%d]=%d " %(qps,100-ltime_99);
-            f.write("%d,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d\n" % (qps,realqps,ptime_50,ptime_95,ptime_99,ltime_50,ltime_95,ltime_99,cpu_util,ipc));
+            f.write("%d,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d\n" % (qps,realqps,ptime_50,ptime_95,ptime_99,ltime_50,ltime_95,ltime_99,ctime_50,ctime_95,ctime_99,cpu_util,ipc));
         f.write("#budgets=( %s )\n" %bl);
         for qps in sorted(logs.keys()):
             f.write("#ltime_per_index=" + str(logs[qps]["ltime_perc"]["perc_index"]) + " ptime_index " + str(logs[qps]["ptime_perc"]["perc_index"]) + " \n");

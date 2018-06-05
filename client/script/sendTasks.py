@@ -224,7 +224,8 @@ class SendTasks:
     #send "start" message to the server indicating that we are going to start to send requests.
     #self.sock.send("START//\n");
 
-
+    nrSent = 1;
+    start = time.time();
     while True:
       timeTask = self.queue.get()
       sendTime = timeTask[0];
@@ -232,11 +233,19 @@ class SendTasks:
       startTime = time.time()
       while len(task) > 0:
         sent = self.sock.send(task)
+        now = time.time();
+#        if (now - sendTime > 0.001):
+#        print 'sendTime:%.10f, startTime:%.10f, nowTime:%.10f\n' %(sendTime, startTime, now);
+#        nrSent += 1;
+#        if nrSent % 10 == 0:
+#          end = time.time();
+#          print '%.2f' %(end - start);
+#          start = end;
 #        print 'sendTime:%.10f, startTime:%.10f, nowTime:%.10f\n' %(sendTime, startTime, time.time());
         if sent <= 0:
           raise RuntimeError('failed to send task "%s"' % task)
         task = task[sent:]
-
+      
 def pruneTasks(taskStrings, numTasksPerCat):
   byCat = {}
   for s in taskStrings:
